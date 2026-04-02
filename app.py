@@ -16,6 +16,7 @@ from PIL import Image
 from easy_ViTPose.inference import VitInference
 from easy_ViTPose.vit_utils.inference import NumpyEncoder
 from easy_ViTPose.vit_utils.visualization import draw_points_and_skeleton, joints_dict
+from pose_editor import prepare_editor_from_path, apply_and_save_keypoints, create_editor_component
 
 # --- paths ---
 BASE_DIR = Path(__file__).parent
@@ -109,17 +110,22 @@ def _batch_nav_state_text(index: int, total: int, source_name: str) -> str:
 
 def _show_batch_item(batch_items: List[Dict[str, str]], index: int):
     if not batch_items:
-        return None, "", 0, gr.update(value=1, minimum=1, maximum=1, visible=False), "Batch sonucu yok."
+        return "", "", 0, gr.update(value=1, minimum=1, maximum=1, visible=False), "Batch sonucu yok.", ""
 
     idx = max(0, min(index, len(batch_items) - 1))
     item = batch_items[idx]
     nav_text = _batch_nav_state_text(idx, len(batch_items), item.get("source_name", ""))
+    editor_payload, _ = prepare_editor_from_path(
+        item.get("original_image", ""),
+        item["json_path"],
+    )
     return (
-        item["result_image"],
+        editor_payload,
         item["json_path"],
         idx,
         gr.update(value=idx + 1, minimum=1, maximum=len(batch_items), visible=True),
         nav_text,
+        item.get("original_image", ""),
     )
 
 
@@ -148,11 +154,12 @@ def run_vitpose(image: Image.Image, folder_path: str):
 
         out_img, json_path, err = _run_inference_for_input(input_path)
         if err:
-            return None, [], err, [], 0, gr.update(value=1, minimum=1, maximum=1, visible=False), gr.update(visible=False), gr.update(visible=False), ""
+            return "", [], err, [], 0, gr.update(value=1, minimum=1, maximum=1, visible=False), gr.update(visible=False), gr.update(visible=False), "", ""
 
+        editor_payload, _ = prepare_editor_from_path(str(input_path), json_path)
         elapsed = time.perf_counter() - t0
         return (
-            out_img,
+            editor_payload,
             [(out_img, input_path.name)],
             f"{json_path}\nDevice: {runtime_device} | Time: {elapsed:.2f}s",
             [],
@@ -161,18 +168,19 @@ def run_vitpose(image: Image.Image, folder_path: str):
             gr.update(visible=False),
             gr.update(visible=False),
             "Tek görüntü modu.",
+            str(input_path),
         )
 
     if not folder_path:
-        return None, [], "Tek bir görüntü yükleyin veya görüntü klasörü yolu girin.", [], 0, gr.update(value=1, minimum=1, maximum=1, visible=False), gr.update(visible=False), gr.update(visible=False), ""
+        return None, [], "Tek bir görüntü yükleyin veya görüntü klasörü yolu girin.", [], 0, gr.update(value=1, minimum=1, maximum=1, visible=False), gr.update(visible=False), gr.update(visible=False), "", ""
 
     dir_path = Path(folder_path)
     if not dir_path.exists() or not dir_path.is_dir():
-        return None, [], f"Klasör bulunamadı veya geçersiz: {folder_path}", [], 0, gr.update(value=1, minimum=1, maximum=1, visible=False), gr.update(visible=False), gr.update(visible=False), ""
+        return None, [], f"Klasör bulunamadı veya geçersiz: {folder_path}", [], 0, gr.update(value=1, minimum=1, maximum=1, visible=False), gr.update(visible=False), gr.update(visible=False), "", ""
 
     image_files = _collect_images_from_directory(dir_path)
     if not image_files:
-        return None, [], f"Klasörde desteklenen görüntü bulunamadı: {folder_path}", [], 0, gr.update(value=1, minimum=1, maximum=1, visible=False), gr.update(visible=False), gr.update(visible=False), ""
+        return None, [], f"Klasörde desteklenen görüntü bulunamadı: {folder_path}", [], 0, gr.update(value=1, minimum=1, maximum=1, visible=False), gr.update(visible=False), gr.update(visible=False), "", ""
 
     gallery_items = []
     batch_items: List[Dict[str, str]] = []
@@ -195,6 +203,7 @@ def run_vitpose(image: Image.Image, folder_path: str):
                     "result_image": out_img,
                     "json_path": json_path,
                     "source_name": img_path.name,
+                    "original_image": str(img_path),
                 })
 
         if json_path:
@@ -202,7 +211,7 @@ def run_vitpose(image: Image.Image, folder_path: str):
 
     if not gallery_items:
         error_text = "\n".join(errors) if errors else "Klasördeki görüntüler işlenemedi."
-        return None, [], error_text, [], 0, gr.update(value=1, minimum=1, maximum=1, visible=False), gr.update(visible=False), gr.update(visible=False), ""
+        return None, [], error_text, [], 0, gr.update(value=1, minimum=1, maximum=1, visible=False), gr.update(visible=False), gr.update(visible=False), "", ""
 
     status_lines = [
         f"Device: {runtime_device}",
@@ -222,8 +231,11 @@ def run_vitpose(image: Image.Image, folder_path: str):
         status_lines.extend(errors)
 
     nav_status = _batch_nav_state_text(0, len(batch_items), batch_items[0]["source_name"]) if batch_items else ""
+    first_original = batch_items[0]["original_image"] if batch_items else ""
+    first_json     = batch_items[0]["json_path"]      if batch_items else ""
+    first_payload, _ = prepare_editor_from_path(first_original, first_json) if first_original else ("", "")
     return (
-        first_result,
+        first_payload,
         gallery_items,
         "\n".join(status_lines),
         batch_items,
@@ -232,6 +244,7 @@ def run_vitpose(image: Image.Image, folder_path: str):
         gr.update(visible=bool(batch_items)),
         gr.update(visible=bool(batch_items)),
         nav_status,
+        first_original,
     )
 
 
@@ -306,32 +319,60 @@ def draw_from_json(image: Image.Image, json_file) -> Tuple[Image.Image, str]:
 with gr.Blocks() as demo:
     gr.Markdown("## easy_ViTPose - Inference + JSON Overlay")
 
-    # Section 1: inference (tek görsel + klasör)
+    # ── Top row: input + interactive pose canvas ─────────────────────────────
     with gr.Row():
-        input_img = gr.Image(type="pil", label="Input Image")
-        input_folder = gr.Textbox(label="Image Folder Path (optional)", placeholder="C:/path/to/images")
-        pose_img = gr.Image(type="pil", label="Pose Result (from inference)")
+        with gr.Column(scale=1):
+            input_img    = gr.Image(type="pil", label="Input Image")
+            input_folder = gr.Textbox(
+                label="Image Folder Path (optional)",
+                placeholder="C:/path/to/images",
+            )
+            run_button   = gr.Button("Run ViTPose")
+            json_path_box = gr.Textbox(label="Inference JSON Path", lines=2)
+        with gr.Column(scale=2):
+            # The pose result IS the interactive editor — no separate step needed
+            pose_editor_html = create_editor_component()
 
-    batch_gallery = gr.Gallery(label="Batch Results (Folder Input)", columns=4, height=260)
+    # ── Apply & Save — directly below the canvas ────────────────────────────
+    # Hidden textbox: JS canvas writes keypoints here; Python reads it.
+    kp_editor_output = gr.Textbox(
+        elem_id="kp_editor_output", visible=False, lines=1
+    )
+    with gr.Row():
+        apply_save_btn = gr.Button("✅ Apply & Save", variant="primary")
+        editor_status  = gr.Textbox(label="Editor Status", lines=1, interactive=False)
+
+    # ── Batch gallery + navigation ───────────────────────────────────────────
+    batch_gallery    = gr.Gallery(label="Batch Results (Folder Input)", columns=4, height=260)
 
     with gr.Row():
         prev_btn = gr.Button("◀ Previous", visible=False)
-        next_btn = gr.Button("Next ▶", visible=False)
-    batch_slider = gr.Slider(label="Frame / Image Index", minimum=1, maximum=1, value=1, step=1, visible=False)
+        next_btn = gr.Button("Next ▶",     visible=False)
+    batch_slider     = gr.Slider(
+        label="Frame / Image Index", minimum=1, maximum=1, value=1, step=1, visible=False
+    )
     batch_nav_status = gr.Textbox(label="Batch Navigation", lines=1, interactive=False)
 
-    batch_items_state = gr.State([])
-    batch_index_state = gr.State(0)
+    # State
+    batch_items_state  = gr.State([])
+    batch_index_state  = gr.State(0)
+    original_img_state = gr.State("")
 
-    with gr.Row():
-        run_button = gr.Button("Run ViTPose")
-        json_path_box = gr.Textbox(label="Inference JSON Path", lines=2)
+    # ── Callbacks ────────────────────────────────────────────────────────────
+    _NAV_OUTPUTS = [
+        pose_editor_html,
+        json_path_box,
+        batch_index_state,
+        batch_slider,
+        batch_nav_status,
+        original_img_state,
+    ]
 
     run_button.click(
         fn=run_vitpose,
         inputs=[input_img, input_folder],
         outputs=[
-            pose_img,
+            pose_editor_html,
             batch_gallery,
             json_path_box,
             batch_items_state,
@@ -340,36 +381,59 @@ with gr.Blocks() as demo:
             prev_btn,
             next_btn,
             batch_nav_status,
+            original_img_state,
         ],
     )
 
     prev_btn.click(
         fn=show_prev_batch,
         inputs=[batch_items_state, batch_index_state],
-        outputs=[pose_img, json_path_box, batch_index_state, batch_slider, batch_nav_status],
+        outputs=_NAV_OUTPUTS,
     )
 
     next_btn.click(
         fn=show_next_batch,
         inputs=[batch_items_state, batch_index_state],
-        outputs=[pose_img, json_path_box, batch_index_state, batch_slider, batch_nav_status],
+        outputs=_NAV_OUTPUTS,
     )
 
     batch_slider.change(
         fn=show_batch_by_slider,
         inputs=[batch_items_state, batch_slider],
-        outputs=[pose_img, json_path_box, batch_index_state, batch_slider, batch_nav_status],
+        outputs=_NAV_OUTPUTS,
     )
 
+    # Read current keypoints directly from canvas on button click.
+    _APPLY_JS = """(orig, kps, jpath, payload) => {
+        var w = document.querySelector('.pe-wrap');
+        if (w && typeof w._peGetKps === 'function') {
+            kps = w._peGetKps();
+        }
+        return [orig, kps, jpath, payload];
+    }"""
+
+    apply_save_btn.click(
+        fn=apply_and_save_keypoints,
+        inputs=[original_img_state, kp_editor_output, json_path_box, pose_editor_html],
+        outputs=[pose_editor_html, editor_status],
+        js=_APPLY_JS,
+    )
+
+    # ── JSON Upload overlay (standalone, has its own image input) ────────────
     gr.Markdown("### JSON Upload → Draw keypoints + skeleton on the image")
 
     with gr.Row():
-        json_file = gr.File(label="Upload Pose JSON (.json)", file_types=[".json"])
-        overlay_img = gr.Image(type="pil", label="Overlay (from uploaded JSON)")
+        overlay_src_img = gr.Image(type="pil", label="Source Image")
+        json_file       = gr.File(label="Upload Pose JSON (.json)", file_types=[".json"])
+        overlay_img     = gr.Image(type="pil", label="Overlay Result")
     overlay_status = gr.Textbox(label="Status", lines=2)
 
     draw_button = gr.Button("Draw From Uploaded JSON")
-    draw_button.click(fn=draw_from_json, inputs=[pose_img, json_file], outputs=[overlay_img, overlay_status])
+    draw_button.click(
+        fn=draw_from_json,
+        inputs=[overlay_src_img, json_file],
+        outputs=[overlay_img, overlay_status],
+    )
 
 if __name__ == "__main__":
     demo.launch()
