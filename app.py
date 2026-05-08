@@ -154,7 +154,7 @@ def run_vitpose(image: Image.Image, folder_path: str):
 
         out_img, json_path, err = _run_inference_for_input(input_path)
         if err:
-            return "", [], err, [], 0, gr.update(value=1, minimum=1, maximum=1, visible=False), gr.update(visible=False), gr.update(visible=False), "", ""
+            return "", [], err, [], 0, gr.update(value=1, minimum=1, maximum=1, visible=False), gr.update(), gr.update(), "", ""
 
         editor_payload, _ = prepare_editor_from_path(str(input_path), json_path)
         elapsed = time.perf_counter() - t0
@@ -165,22 +165,22 @@ def run_vitpose(image: Image.Image, folder_path: str):
             [],
             0,
             gr.update(value=1, minimum=1, maximum=1, visible=False),
-            gr.update(visible=False),
-            gr.update(visible=False),
+            gr.update(),
+            gr.update(),
             "Tek görüntü modu.",
             str(input_path),
         )
 
     if not folder_path:
-        return None, [], "Tek bir görüntü yükleyin veya görüntü klasörü yolu girin.", [], 0, gr.update(value=1, minimum=1, maximum=1, visible=False), gr.update(visible=False), gr.update(visible=False), "", ""
+        return None, [], "Tek bir görüntü yükleyin veya görüntü klasörü yolu girin.", [], 0, gr.update(value=1, minimum=1, maximum=1, visible=False), gr.update(), gr.update(), "", ""
 
     dir_path = Path(folder_path)
     if not dir_path.exists() or not dir_path.is_dir():
-        return None, [], f"Klasör bulunamadı veya geçersiz: {folder_path}", [], 0, gr.update(value=1, minimum=1, maximum=1, visible=False), gr.update(visible=False), gr.update(visible=False), "", ""
+        return None, [], f"Klasör bulunamadı veya geçersiz: {folder_path}", [], 0, gr.update(value=1, minimum=1, maximum=1, visible=False), gr.update(), gr.update(), "", ""
 
     image_files = _collect_images_from_directory(dir_path)
     if not image_files:
-        return None, [], f"Klasörde desteklenen görüntü bulunamadı: {folder_path}", [], 0, gr.update(value=1, minimum=1, maximum=1, visible=False), gr.update(visible=False), gr.update(visible=False), "", ""
+        return None, [], f"Klasörde desteklenen görüntü bulunamadı: {folder_path}", [], 0, gr.update(value=1, minimum=1, maximum=1, visible=False), gr.update(), gr.update(), "", ""
 
     gallery_items = []
     batch_items: List[Dict[str, str]] = []
@@ -241,8 +241,8 @@ def run_vitpose(image: Image.Image, folder_path: str):
         batch_items,
         0,
         gr.update(value=1, minimum=1, maximum=len(batch_items), visible=bool(batch_items)),
-        gr.update(visible=bool(batch_items)),
-        gr.update(visible=bool(batch_items)),
+        gr.update(),
+        gr.update(),
         nav_status,
         first_original,
     )
@@ -316,6 +316,10 @@ def draw_from_json(image: Image.Image, json_file) -> Tuple[Image.Image, str]:
     return out_img, f"Loaded JSON: {json_path.name} | thr={thr}"
 
 
+_CSS = """
+.pe-hidden-trigger { display: none !important; }
+"""
+
 with gr.Blocks() as demo:
     gr.Markdown("## easy_ViTPose - Inference + JSON Overlay")
 
@@ -336,7 +340,7 @@ with gr.Blocks() as demo:
     # ── Apply & Save — directly below the canvas ────────────────────────────
     # Hidden textbox: JS canvas writes keypoints here; Python reads it.
     kp_editor_output = gr.Textbox(
-        elem_id="kp_editor_output", visible=False, lines=1
+        elem_id="kp_editor_output", elem_classes="pe-hidden-trigger", lines=1
     )
     with gr.Row():
         apply_save_btn = gr.Button("✅ Apply & Save", variant="primary")
@@ -345,9 +349,9 @@ with gr.Blocks() as demo:
     # ── Batch gallery + navigation ───────────────────────────────────────────
     batch_gallery    = gr.Gallery(label="Batch Results (Folder Input)", columns=4, height=260)
 
-    with gr.Row():
-        prev_btn = gr.Button("◀ Previous", visible=False)
-        next_btn = gr.Button("Next ▶",     visible=False)
+    # Hidden Textboxes for JS to trigger prev/next via change event
+    prev_trigger = gr.Textbox(elem_classes="pe-hidden-trigger", elem_id="pe_prev_trigger")
+    next_trigger = gr.Textbox(elem_classes="pe-hidden-trigger", elem_id="pe_next_trigger")
     batch_slider     = gr.Slider(
         label="Frame / Image Index", minimum=1, maximum=1, value=1, step=1, visible=False
     )
@@ -378,20 +382,20 @@ with gr.Blocks() as demo:
             batch_items_state,
             batch_index_state,
             batch_slider,
-            prev_btn,
-            next_btn,
+            prev_trigger,
+            next_trigger,
             batch_nav_status,
             original_img_state,
         ],
     )
 
-    prev_btn.click(
+    prev_trigger.change(
         fn=show_prev_batch,
         inputs=[batch_items_state, batch_index_state],
         outputs=_NAV_OUTPUTS,
     )
 
-    next_btn.click(
+    next_trigger.change(
         fn=show_next_batch,
         inputs=[batch_items_state, batch_index_state],
         outputs=_NAV_OUTPUTS,
@@ -436,4 +440,4 @@ with gr.Blocks() as demo:
     )
 
 if __name__ == "__main__":
-    demo.launch()
+    demo.launch(css=_CSS)
