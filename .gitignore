@@ -1,13 +1,59 @@
+# ── Model weights (never commit large binaries) ───────────────────────────
 **/*.pt
 **/*.pth
 **/*.onnx
-**/__pycache__
+**/*.trt
+**/*.engine
+
+# ── Runtime directories ───────────────────────────────────────────────────
+__pycache__/
+**/__pycache__/
+*.pyc
+*.pyo
+
+# ── Experiment / output directories ──────────────────────────────────────
+runs/
+ckpts/
+checkpoints/
+outputs/
+temp/
+models/
+
+# ── Dataset / annotation directories ─────────────────────────────────────
+annotations/
+examples/
 **/coco/
+
+# ── IDE / tooling configs ─────────────────────────────────────────────────
+.idea/
+.vscode/
+*.iml
 .DS_Store
-runs
-ckpts
-annotations
-examples
-outputs
-.ipynb_checkpoints
-easy_ViTPose.egg-info
+Thumbs.db
+
+# ── Virtual environments ──────────────────────────────────────────────────
+.venv/
+venv/
+env/
+
+# ── Jupyter ───────────────────────────────────────────────────────────────
+.ipynb_checkpoints/
+
+# ── Build artifacts ───────────────────────────────────────────────────────
+easy_ViTPose.egg-info/
+dist/
+build/
+*.egg-info/
+
+# ── Logs and error files ──────────────────────────────────────────────────
+*.log
+error.log
+
+# ── Test / scratch images committed by accident ──────────────────────────
+test.png
+test2.jpeg
+zebra.jpg
+
+# ── Internal notes and AI-generated artifacts ─────────────────────────────
+# (add specific filenames if you keep personal .md notes locally)
+# my_notes.md

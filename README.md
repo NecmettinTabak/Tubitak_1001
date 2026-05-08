@@ -1,334 +1,374 @@
-# easy_ViTPose
+# easy_ViTPose — İnteraktif Poz Tahmini ve Düzenleyici
+
 <p align="center">
-<img src="https://user-images.githubusercontent.com/24314647/236082274-b25a70c8-9267-4375-97b0-eddf60a7dfc6.png" width=375> easy_ViTPose
+  <img src="https://user-images.githubusercontent.com/24314647/236082274-b25a70c8-9267-4375-97b0-eddf60a7dfc6.png" width="340"/>
 </p>
 
-## Accurate 2d human and animal pose estimation
+<p align="center">
+  <b>İnsan Poz Tahmini · Eklem Noktası Düzenleme · İskelet Görselleştirme</b><br/>
+  <a href="https://github.com/JunkyByte/easy_ViTPose">easy_ViTPose</a> üzerine inşa edilmiştir · Gradio 5 web arayüzü
+</p>
 
-<a target="_blank" href="https://colab.research.google.com/github/JunkyByte/easy_ViTPose/blob/main/colab_demo.ipynb">
-  <img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/>
-</a>
+<p align="center">
+  <br/>
+  <i>🏅 TÜBİTAK 1001 Projesi kapsamında geliştirilmiştir</i><br/>
+  <b>Artistik Cimnastik Sporu için Poz Tabanlı Hareket Tespit Sistemi<br/>Tasarımı ve Prototip Gerçeklenmesi</b>
+</p>
 
-### Easy to use SOTA `ViTPose` [Y. Xu et al., 2022] models for fast inference.  
-We provide all the VitPose original models, converted for inference, with single dataset format output.
+---
 
-In addition to that we also provide a Coco-25 model, trained on the original coco dataset + feet https://cmu-perceptual-computing-lab.github.io/foot_keypoint_dataset/
+## Bu Proje Ne Yapıyor?
+
+Bu proje, [easy_ViTPose](https://github.com/JunkyByte/easy_ViTPose) kütüphanesini **tam kapsamlı bir Gradio web arayüzü** ile genişletmektedir. Arayüz aracılığıyla şunları yapabilirsiniz:
+
+1. Tek bir görüntü veya klasördeki tüm görüntüler üzerinde **ViTPose çıkarımı (inference)** çalıştırmak (ViTPose-H, COCO-25 modeli).
+2. Tespit edilen eklem noktalarını canvas üzerinde **sürükleyerek interaktif biçimde düzenlemek**.
+3. Omuz, dirsek, kalça ve diz için **eklem açılarını** görüntü üzerinde göstermek.
+4. Düzenlenen sonuçları JSON dosyasına **kaydedip** aşağı akış boru hatlarına aktarmak.
+5. Batch sonuçlarında araç çubuğuna gömülü **Prev / Next** kontrolleriyle kare kare gezinmek.
+6. Mevcut bir JSON dosyasını herhangi bir görüntü üzerine yansıtarak **iskelet görselleştirmesi** yapmak (yeniden çıkarım gerekmez).
+
+Bu araç; jimnastik, atletizm gibi alanlarda otomatik poz tahminlerinin manuel olarak düzeltilmesinin gerektiği **biyomekanik / spor bilimi araştırmaları** için tasarlanmıştır.
+
+---
+
+## Arayüze Genel Bakış
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│  Girdi Paneli                 │  İnteraktif Poz Düzenleyici (canvas)     │
+│  ──────────────────────────── │  ──────────────────────────────────────  │
+│  • Tek görüntü yükle  VEYA   │  • Eklem noktasını sürükleyerek düzelt   │
+│  • Klasör yolunu yaz          │  • Kaydırma → Zoom / Boş alan sürükle →  │
+│  • [Run ViTPose] butonu       │    Pan                                   │
+│  • JSON yolu çıktı kutusu     │  • İsimler / Açılar / Noktalar aç-kapat  │
+│                               │  • Tam ekran modu                        │
+│                               │  • PNG anlık görüntü kaydet              │
+│                               │  • ◀ Prev  │  Next ▶  (batch gezinti)   │
+├─────────────────────────────────────────────────────────────────────────┤
+│  [✅ Apply & Save]  ←  düzenlenen noktaları JSON'a yazar                │
+│  Batch galeri (küçük resim şeridi, klasör modu)                         │
+│  Kare / Görüntü kaydırıcısı                                             │
+├─────────────────────────────────────────────────────────────────────────┤
+│  JSON Yükleme → Çizim  (bağımsız kaplama bölümü)                        │
+│  • Kaynak görüntü + mevcut .json yükle → iskelet kaplamasını işle       │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### Poz Düzenleyici Kontrolleri
+
+| Kontrol | İşlev |
+|---|---|
+| **Eklem noktasını sürükle** | Seçili eklemi hareket ettirir; değişiklik anında yansır |
+| **Kaydırma tekerleği** | İmleç merkezli zoom açar / kapatır |
+| **Boş alanı sürükle** | Canvas'ı kaydırır (pan) |
+| **Boş alana çift tıkla** | Zoom ve pan'ı sıfırlar |
+| **↩ Reset** | Orijinal eklem konumlarını geri yükler |
+| **👁 Names** | Eklem adı etiketlerini gösterir / gizler |
+| **💾 Save PNG** | Güncel canvas görünümünü PNG olarak indirir |
+| **📐 Açılar** | Eklem açısı yay göstergelerini açar / kapatır |
+| **⤢ Tam Ekran** | Tam ekran moduna geçer |
+| **● Noktalar** | Tüm eklem noktaları ve iskeleti gösterir / gizler |
+| **◀ Prev / Next ▶** | Önceki / sonraki batch görüntüsüne geçer |
+| **✅ Apply & Save** | Düzenlenen noktaları JSON dosyasına kaydeder |
+
+---
+
+## Proje Yapısı
+
+```
+easy_ViTPose/
+├── app.py                      # Gradio uygulama giriş noktası
+├── pose_editor.py              # İnteraktif canvas düzenleyici (HTML/CSS/JS + Python yardımcıları)
+├── inference.py                # Komut satırı çıkarım betiği (orijinal easy_ViTPose)
+├── export.py                   # ONNX / TensorRT dışa aktarma
+├── model_split.py              # İnce ayar için ön eğitimli checkpoint dönüştürücü
+├── evaluation_on_coco.py       # COCO değerlendirme betiği
+├── setup.py                    # Paket kurulum dosyası
+├── requirements.txt            # Python bağımlılıkları (CPU / genel)
+├── requirements_gpu.txt        # GPU'ya özgü ek bağımlılıklar
+├── requirements.notorch.txt    # PyTorch olmadan bağımlılıklar (özel kurulumlar)
+├── Dockerfile                  # NVIDIA PyTorch container yapısı
+├── checkpoints/                # ← model ağırlıklarını buraya koyun (git-ignored)
+│   ├── vitpose-h-coco_25.pth
+│   └── yolo11x.pt
+├── easy_ViTPose/               # Temel kütüphane paketi
+├── temp/                       # Çalışma zamanı geçici dosyalar (git-ignored)
+└── outputs/                    # Çıkarım çıktıları (git-ignored)
+```
+
+---
+
+## Ön Koşullar
+
+### 1 — Python
+
+**Python 3.9 – 3.11** önerilir. Python 3.12 bazı bilimsel paketlerle uyumluluk sorunları yaşayabilir.
+
+### 2 — PyTorch
+
+Geri kalan bağımlılıkları kurmadan önce **PyTorch ≥ 2.0**'ı manuel olarak kurun.  
+Donanımınıza uygun sürümü seçin:
+
+```bash
+# CUDA 12.1 (NVIDIA GPU)
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+
+# Yalnızca CPU
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+
+# Apple Silicon (MPS)
+pip install torch torchvision torchaudio
+```
+
+> [!IMPORTANT]
+> PyTorch, `pip install -r requirements.txt` komutundan **önce** kurulmalıdır.  
+> Gereksinim dosyaları, doğru CUDA sürümünü seçebilmeniz için PyTorch'u kasıtlı olarak içermez.
+
+### 3 — easy_ViTPose Kurulumu (Harici Bağımlılık)
+
+Bu proje, çıkarım motoru olarak [easy_ViTPose](https://github.com/JunkyByte/easy_ViTPose) kütüphanesine bağımlıdır.  
+Kütüphaneyi kaynaktan **düzenlenebilir paket** olarak kurmanız gerekmektedir:
+
+```bash
+# Upstream kütüphaneyi klonlayın
+git clone https://github.com/JunkyByte/easy_ViTPose.git
+cd easy_ViTPose
+
+# Düzenlenebilir paket olarak kurun
+pip install -e .
+```
+
+> [!NOTE]
+> Doğrudan klonlanan `easy_ViTPose` deposu içinde çalışıyorsanız (yani bu README repo kökündeyse),  
+> bu dizinden `pip install -e .` komutu yeterlidir — `easy_ViTPose` zaten kurulan pakettir.
+
+---
+
+## Kurulum
+
+```bash
+# 1. Bu repoyu klonlayın
+git clone https://github.com/<kullanici-adiniz>/easy_ViTPose.git
+cd easy_ViTPose
+
+# 2. Önce PyTorch'u kurun (bkz. Ön Koşullar → adım 2)
+
+# 3. Paketi düzenlenebilir modda kurun
+pip install -e .
+
+# 4. Geri kalan Python bağımlılıklarını kurun
+pip install -r requirements.txt
+
+# 5. (İsteğe bağlı) GPU'ya özgü ekstralar (ör. onnxruntime-gpu)
+pip install -r requirements_gpu.txt
+
+# 6. Gradio'yu kurun (henüz yüklü değilse)
+pip install gradio>=5.0
+```
+
+### Temel Python Paketleri
+
+| Paket | Amaç |
+|---|---|
+| `gradio >= 5.0` | Web arayüzü çerçevesi |
+| `torch >= 2.0` | Derin öğrenme çıkarımı |
+| `ultralytics` | YOLOv11 insan algılayıcı |
+| `opencv-python` | Görüntü G/Ç ve çizim işlemleri |
+| `scipy` | TPS warp (RBF interpolasyonu) |
+| `numpy`, `Pillow` | Dizi ve görüntü yardımcıları |
+| `onnxruntime` | İsteğe bağlı ONNX çıkarımı |
+
+---
+
+## Model Ağırlıklarını İndirme
+
+Model checkpoint'lerini `checkpoints/` dizinine koyun (yoksa oluşturun):
+
+```
+checkpoints/
+├── vitpose-h-coco_25.pth   # COCO + ayak veri setiyle eğitilmiş ViTPose-H (25 eklem noktası)
+└── yolo11x.pt              # YOLOv11x insan algılayıcı
+```
+
+**Hugging Face** üzerinden indirin:  
+👉 [https://huggingface.co/JunkyByte/easy_ViTPose](https://huggingface.co/JunkyByte/easy_ViTPose)
 
 > [!WARNING]
-> Ultralytics `yolov8` has issue with wrong bounding boxes when using `mps`, upgrade to latest version! (Works correctly on 8.2.48)
+> Model dosyaları (`.pth`, `.pt`, `.onnx`) git-ignored olup ayrıca indirilmelidir.  
+> Bu dosyaları repoya **commit etmeyin**.
 
-## Results
-![resimg](https://github.com/JunkyByte/easy_ViTPose/assets/24314647/51c0777f-b268-448a-af02-9a3537f288d8)
-
-https://github.com/JunkyByte/easy_ViTPose/assets/24314647/e9a82c17-6e99-4111-8cc8-5257910cb87e
-
-https://github.com/JunkyByte/easy_ViTPose/assets/24314647/63af44b1-7245-4703-8906-3f034a43f9e3
-
-(Credits dance: https://www.youtube.com/watch?v=p-rSdt0aFuw )  
-(Credits zebras: https://www.youtube.com/watch?v=y-vELRYS8Yk )
-
-## Features
-- Image / Video / Webcam support
-- Video support using SORT algorithm to track bboxes between frames
-- Torch / ONNX / Tensorrt inference
-- Runs the original VitPose checkpoints from [ViTAE-Transformer/ViTPose](https://github.com/ViTAE-Transformer/ViTPose)
-- 4 ViTPose architectures with different sizes and performances (s: small, b: base, l: large, h: huge)
-- Multi skeleton and dataset: (AIC / MPII / COCO / COCO + FEET / COCO WHOLEBODY / APT36k / AP10k)
-- Human / Animal pose estimation
-- cpu / gpu / metal support
-- show and save images / videos and output to json
-
-We run YOLOv8 for detection, it does not provide complete animal detection. You can finetune a custom yolo model to detect the animal you are interested in,
-if you do please open an issue, we might want to integrate other models for detection.
-
-### Benchmark:
-You can expect realtime >30 fps with modern nvidia gpus and apple silicon (using metal!).  
-
-### Skeleton reference
-There are multiple skeletons for different dataset. Check the definition here [visualization.py](https://github.com/JunkyByte/easy_ViTPose/blob/main/easy_ViTPose/vit_utils/visualization.py).
-
-## Installation and Usage
-> [!IMPORTANT]
-> Install `torch>2.0 with cuda / mps support` by yourself.
-> also check `requirements_gpu.txt`.
+YOLO modeli için Ultralytics ilk çalıştırmada otomatik olarak indirir; ya da manuel indirebilirsiniz:
 
 ```bash
-git clone git@github.com:JunkyByte/easy_ViTPose.git
-cd easy_ViTPose/
-pip install -e .
-pip install -r requirements.txt
+python -c "from ultralytics import YOLO; YOLO('yolo11x.pt')"
+# Ardından yolo11x.pt dosyasını checkpoints/ dizinine taşıyın
 ```
 
-### Download models
-- Download the models from [Huggingface](https://huggingface.co/JunkyByte/easy_ViTPose)
-We provide torch models for every dataset and architecture.  
-If you want to run onnx / tensorrt inference download the appropriate torch ckpt and use `export.py` to convert it.  
-You can use `ultralytics` `yolo export` command to export yolo to onnx and tensorrt as well.
+---
 
-#### Export to onnx and tensorrt
+## Uygulamayı Çalıştırma
+
 ```bash
-$ python export.py --help
-usage: export.py [-h] --model-ckpt MODEL_CKPT --model-name {s,b,l,h} [--output OUTPUT] [--dataset DATASET]
-
-optional arguments:
-  -h, --help            show this help message and exit
-  --model-ckpt MODEL_CKPT
-                        The torch model that shall be used for conversion
-  --model-name {s,b,l,h}
-                        [s: ViT-S, b: ViT-B, l: ViT-L, h: ViT-H]
-  --output OUTPUT       File (without extension) or dir path for checkpoint output
-  --dataset DATASET     Name of the dataset. If None it"s extracted from the file name. ["coco", "coco_25",
-                        "wholebody", "mpii", "ap10k", "apt36k", "aic"]
+python app.py
 ```
 
-### Run inference
-To run inference from command line you can use the `inference.py` script as follows:  
-```bash
-$ python inference.py --help
-usage: inference.py [-h] [--input INPUT] [--output-path OUTPUT_PATH] --model MODEL [--yolo YOLO] [--dataset DATASET]
-                    [--det-class DET_CLASS] [--model-name {s,b,l,h}] [--yolo-size YOLO_SIZE]
-                    [--conf-threshold CONF_THRESHOLD] [--rotate {0,90,180,270}] [--yolo-step YOLO_STEP]
-                    [--single-pose] [--show] [--show-yolo] [--show-raw-yolo] [--save-img] [--save-json]
-
-optional arguments:
-  -h, --help            show this help message and exit
-  --input INPUT         path to image / video or webcam ID (=cv2)
-  --output-path OUTPUT_PATH
-                        output path, if the path provided is a directory output files are "input_name
-                        +_result{extension}".
-  --model MODEL         checkpoint path of the model
-  --yolo YOLO           checkpoint path of the yolo model
-  --dataset DATASET     Name of the dataset. If None it"s extracted from the file name. ["coco", "coco_25",
-                        "wholebody", "mpii", "ap10k", "apt36k", "aic"]
-  --det-class DET_CLASS
-                        ["human", "cat", "dog", "horse", "sheep", "cow", "elephant", "bear", "zebra", "giraffe",
-                        "animals"]
-  --model-name {s,b,l,h}
-                        [s: ViT-S, b: ViT-B, l: ViT-L, h: ViT-H]
-  --yolo-size YOLO_SIZE
-                        YOLOv8 image size during inference
-  --conf-threshold CONF_THRESHOLD
-                        Minimum confidence for keypoints to be drawn. [0, 1] range
-  --rotate {0,90,180,270}
-                        Rotate the image of [90, 180, 270] degress counterclockwise
-  --yolo-step YOLO_STEP
-                        The tracker can be used to predict the bboxes instead of yolo for performance, this flag
-                        specifies how often yolo is applied (e.g. 1 applies yolo every frame). This does not have any
-                        effect when is_video is False
-  --single-pose         Do not use SORT tracker because single pose is expected in the video
-  --show                preview result during inference
-  --show-yolo           draw yolo results
-  --show-raw-yolo       draw yolo result before that SORT is applied for tracking (only valid during video inference)
-  --save-img            save image results
-  --save-json           save json results
-```
-
-You can run inference from code as follows:
-```python
-import cv2
-from easy_ViTPose import VitInference
-
-# Image to run inference RGB format
-img = cv2.imread('./examples/img1.jpg')
-img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-
-# set is_video=True to enable tracking in video inference
-# be sure to use VitInference.reset() function to reset the tracker after each video
-# There are a few flags that allows to customize VitInference, be sure to check the class definition
-model_path = './ckpts/vitpose-s-coco_25.pth'
-yolo_path = './yolov8s.pth'
-
-# If you want to use MPS (on new macbooks) use the torch checkpoints for both ViTPose and Yolo
-# If device is None will try to use cuda -> mps -> cpu (otherwise specify 'cpu', 'mps' or 'cuda')
-# dataset and det_class parameters can be inferred from the ckpt name, but you can specify them.
-model = VitInference(model_path, yolo_path, model_name='s', yolo_size=320, is_video=False, device=None)
-
-# Infer keypoints, output is a dict where keys are person ids and values are keypoints (np.ndarray (25, 3): (y, x, score))
-# If is_video=True the IDs will be consistent among the ordered video frames.
-keypoints = model.inference(img)
-
-# call model.reset() after each video
-
-img = model.draw(show_yolo=True)  # Returns RGB image with drawings
-cv2.imshow('image', cv2.cvtColor(img, cv2.COLOR_RGB2BGR)); cv2.waitKey(0)
-```
-> [!NOTE]
-> If the input file is a video [SORT](https://github.com/abewley/sort) is used to track people IDs and output consistent identifications.
-
-### OUTPUT json format
-The output format of the json files:
+Gradio sunucusu yerel olarak başlar. Tarayıcınızda şu adresi açın:
 
 ```
+http://127.0.0.1:7860
+```
+
+### Tek Görüntü Modu
+
+1. **Input Image** alanına `.jpg` / `.png` / `.webp` dosyası yükleyin.
+2. **Run ViTPose** düğmesine tıklayın.
+3. Tespit edilen iskelet interaktif canvas üzerinde görünür.
+4. Pozu düzeltmek için eklem noktalarını sürükleyin.
+5. Düzeltilen koordinatları JSON'a yazmak için **✅ Apply & Save** düğmesine tıklayın.
+
+### Batch / Klasör Modu
+
+1. *Image Folder Path* alanına görüntüler içeren klasörün **tam yolunu** yazın.
+2. **Run ViTPose** düğmesine tıklayın.
+3. Tüm görüntüler işlenir; sonuçlar galeride belirir.
+4. **◀ Prev / Next ▶** veya **Frame / Image** kaydırıcısıyla gezinin.
+5. Her kareyi bağımsız olarak düzenleyin ve kaydedin.
+
+### JSON Kaplama Modu (Alt Bölüm)
+
+1. Bir kaynak görüntü yükleyin.
+2. Mevcut bir poz `.json` dosyası yükleyin (easy_ViTPose çıktı formatında).
+3. **Draw From Uploaded JSON** düğmesine tıklayın.
+4. Çıkarım yeniden çalıştırılmadan iskelet görüntü üzerine çizilir.
+
+---
+
+## Çıktı JSON Formatı
+
+Çıkarım çıktısı easy_ViTPose standart formatını izler:
+
+```json
 {
-    "keypoints":
-    [  # The list of frames, len(json['keypoints']) == len(video)
-        {  # For each frame a dict
-            "0": [  #  keys are id to track people and value the keypoints
-                [121.19, 458.15, 0.99], # Each keypoint is (y, x, score)
-                [110.02, 469.43, 0.98],
-                [110.86, 445.04, 0.99],
-            ],
-            "1": [
-                ...
-            ],
-        },
-        {
-            "0": [
-                [122.19, 458.15, 0.91],
-                [105.02, 469.43, 0.95],
-                [122.86, 445.04, 0.99],
-            ],
-            "1": [
-                ...
-            ]
-        }
-    ],
-    "skeleton":
-    {  # Skeleton reference, key the idx, value the name
-        "0": "nose",
-        "1": "left_eye",
-        "2": "right_eye",
-        "3": "left_ear",
-        "4": "right_ear",
-        "5": "neck",
-        ...
+  "keypoints": [
+    {
+      "0": [
+        [121.19, 458.15, 0.99],
+        [110.02, 469.43, 0.98],
+        "..."
+      ]
     }
+  ],
+  "skeleton": {
+    "0": "nose",
+    "1": "left_eye",
+    "2": "right_eye",
+    "3": "left_ear",
+    "4": "right_ear",
+    "5": "neck",
+    "6": "right_shoulder",
+    "7": "left_shoulder",
+    "8": "right_elbow",
+    "9": "left_elbow",
+    "10": "right_wrist",
+    "11": "left_wrist",
+    "12": "right_hip",
+    "13": "left_hip",
+    "14": "right_knee",
+    "15": "left_knee",
+    "16": "right_ankle",
+    "17": "left_ankle",
+    "18": "right_big_toe",
+    "19": "right_small_toe",
+    "20": "right_heel",
+    "21": "left_big_toe",
+    "22": "left_small_toe",
+    "23": "left_heel",
+    "24": "head_top"
+  }
 }
 ```
 
+Her eklem noktası değeri görüntü piksel koordinatlarında `[y, x, güven_skoru]` biçimindedir.
+
 ---
 
-## Finetuning
+## Komut Satırı Çıkarımı (Gradio Olmadan)
 
-> [!NOTE]
-> easy_ViTPose supports finetuning again! Many thanks to [@CatoTea](https://github.com/CatoTea) for adding it back 🚀
+Orijinal `inference.py` betiğini kullanarak komut satırından da çıkarım yapabilirsiniz:
 
-This guide provides the general process to finetune ViTPose on your own custom dataset.
-### 1. Prepare Pre-trained Checkpoint
-
-- Download an official ViTPose checkpoint from the [official release](https://github.com/ViTAE-Transformer/ViTPose).
-- Convert the official checkpoint into a single-head model suitable for fine-tuning.
-  ```bash
-  python ./model_split.py --source SOURCE --prefix PREFIX --target TARGET
-  ```
-- Set the checkpoint path for resuming from the model in:
-
-  ```./easy_ViTPose/config.yaml```
-### 2. Prepare Dataset
-- Prepare your dataset in **COCO format** with the following directory structure:
-    ```
-    data/
-    ├── train/
-    │   ├── config/
-    │   │   └── config.json
-    │   └── images/
-    │       ├── file_name_0.jpg
-    │       ├── file_name_1.jpg
-    │       ├── file_name_2.jpg
-    │       └── ...
-    ├── val/...
-    └── test/...
-    ```
-    or modify ```./easy_ViTPose/datasets/COCO.py``` to fit your own structure if necessary.
-
-- Configure attributes in ```./easy_ViTPose/datasets/COCO.py``` according to your dataset:
-    - ```self.kpt_id```
-    - ```self.upper_body_ids```
-    - ```self.lower_body_ids```
-    - ```self.joints_weight```
-
-### 3. Configure and Start Training
-- Edit your training config at:
-  ```./easy_ViTPose/configs/train_configs/ViTPose_large_coco_256x192_custom.py```
-
-> [!NOTE]
-> This is a sample config file for ViTPose large; you can refer to other config files for customization.
-
-- Start training:
-  ```bash
-  python train.py --config-path config.yaml --model-name 'c' --freeze-backbone False
-  ```
-
-### 4. Inference on Custom Data
-- Edit number of keypoints in ```./easy_ViTPose/configs/ViTPose_custom.py```.
-- Modify the ```joints_dict()``` dictionary for visualization in ```./easy_ViTPose/vit_utils/visualization.py``` to fit your custom data.
-- Run the following example command with your YOLO detection class and dataset name:
 ```bash
-python inference.py --input INPUT_PATH --model ./best.pth --yolo ./yolo11x.pt --dataset custom --model-name l --output-path OUTPUT_PATH --det-class cow --save-img --save-json --show-yolo  --conf-threshold 0.25 --yolo-size 640
+python inference.py \
+  --input ./test.png \
+  --model ./checkpoints/vitpose-h-coco_25.pth \
+  --yolo  ./checkpoints/yolo11x.pt \
+  --dataset coco_25 \
+  --model-name h \
+  --save-img \
+  --save-json \
+  --output-path ./outputs
 ```
 
+Tüm seçenekler için `python inference.py --help` komutunu çalıştırın.
 
 ---
-
----
-
-## Evaluation on COCO dataset
-1. Download COCO dataset images and labels
-    - 2017 Val images [5K/1GB]: http://images.cocodataset.org/zips/val2017.zip <br>
-        The extracted directory looks like this:
-        ```
-        val2017/              
-        ├── 000000000139.jpg
-        ├── 000000000285.jpg
-        ├── 000000000632.jpg
-        └── ...
-        ```  
-    - 2017 Train/Val annotations [241MB]: http://images.cocodataset.org/annotations/annotations_trainval2017.zip <br>
-        The extracted directory looks like this:
-        ```
-        annotations/              
-        ├── person_keypoints_val2017.json
-        ├── person_keypoints_train2017.json
-        └── ...
-        ```  
-
-2. Run the following command:
-
-    ```bash
-
-    $ python evaluation_on_coco.py
-
-    Command line arguments:
-        --model_path: Path to the pretrained ViT Pose model
-        
-        --yolo_path: Path to the YOLOv8 model
-
-        --img_folder_path: Path to the directory containing COCO val images (/val2017 extracted in step 1). 
-
-        --annFile: Path to json file for COCO keypoints for val set (annotations/person_keypoints_val2017.json extracted in step 1)
-    ```
-
----
-
 
 ## Docker
-The system may be built in a container using Docker. This is intended to demonstrate container-wise inference, adapt it to your own needs by changing models and skeletons:
 
-`docker build . -t easy_vitpose`
+Container'ı derleyin (GPU desteği için NVIDIA Container Toolkit gereklidir):
 
-The image is based on NVIDIA's PyTorch image, which is 20GB large. 
-If you have a compatible GPU set up with [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html), 
-ViTPose will run with hardware acceleration.
+```bash
+docker build . -t easy_vitpose
+```
 
-To test an example, create a folder called `cats` with a picture of a cat as `image.jpg`. 
-Run `./models/download.sh` to fetch the large yolov8 and ap10k ViTPose models. Then run inference using the following command (replace with the correct `cats` and `models` paths):
+Container içinde çıkarım çalıştırın:
 
-`docker run --gpus all --rm -it --ipc=host --ulimit memlock=-1 --ulimit stack=67108864 -v ./models:/models -v ~/cats:/cats easy_vitpose python inference.py --det-class cat --input /cats/image.jpg --output-path /cats --save-img --model /models/vitpose-l-ap10k.onnx --yolo /models/yolov8l.pt`
+```bash
+docker run --gpus all --rm -it \
+  --ipc=host \
+  -v ./checkpoints:/checkpoints \
+  -v ./inputs:/inputs \
+  -v ./outputs:/outputs \
+  easy_vitpose \
+  python inference.py \
+    --input /inputs/image.jpg \
+    --model /checkpoints/vitpose-h-coco_25.pth \
+    --yolo  /checkpoints/yolo11x.pt \
+    --dataset coco_25 --model-name h \
+    --save-img --save-json \
+    --output-path /outputs
+```
 
-The result image may be viewed in your `cats` folder.
+---
 
-## TODO:
-- refactor finetuning (currently not available)
-- benchmark and check bottlenecks of inference pipeline
-- parallel batched inference
-- other minor fixes
-- yolo version for animal pose, check https://github.com/JunkyByte/easy_ViTPose/pull/18
-- solve cuda exceptions on script exit when using tensorrt (no idea how)
-- add infos about inferred informations during inference, better output of inference status (device etc)
-- check if is possible to make colab work without runtime restart
+## İnce Ayar (Fine-tuning)
 
-Feel free to open issues, pull requests and contribute on these TODOs.
+Ayrıntılar için upstream [easy_ViTPose ince ayar kılavuzuna](https://github.com/JunkyByte/easy_ViTPose#finetuning) bakın.  
+Bu repoda yer alan yardımcı betikler:
 
-## Reference
-Thanks to the VitPose authors and their official implementation [ViTAE-Transformer/ViTPose](https://github.com/ViTAE-Transformer/ViTPose).  
-The SORT code is taken from [abewley/sort](https://github.com/abewley/sort)
+- **`model_split.py`** — Resmi ViTPose checkpoint'ini tek başlıklı formata dönüştürür.
+- **`evaluation_on_coco.py`** — Bir modeli COCO val2017 seti üzerinde değerlendirir.
+- **`export.py`** — `.pth` checkpoint'ini ONNX / TensorRT formatına aktarır.
+
+---
+
+## Sorun Giderme
+
+| Sorun | Çözüm |
+|---|---|
+| `ModuleNotFoundError: easy_ViTPose` | Repo kökünde `pip install -e .` komutunu çalıştırın |
+| Model bulunamadı | `checkpoints/vitpose-h-coco_25.pth` dosyasının var olduğundan emin olun |
+| YOLO indirme başarısız | `yolo11x.pt` dosyasını manuel indirip `checkpoints/` dizinine koyun |
+| `GRADIO_DISABLE_BROTLI` uyarısı | `app.py` içinde zaten ayarlanmış; güvenle görmezden gelebilirsiniz |
+| MPS'te yanlış sınırlayıcı kutu | `ultralytics`'i ≥ 8.2.48 sürümüne yükseltin |
+| Canvas yüklenmiyor | Gradio ≥ 5.0 kullandığınızdan emin olun; düzenleyici `gr.HTML` ile `html_template` kullanmaktadır |
+
+---
+
+## Kaynaklar ve Referanslar
+
+- ViTPose makalesi: [Y. Xu ve ark., 2022](https://arxiv.org/abs/2204.12484)
+- Upstream kütüphane: [JunkyByte/easy_ViTPose](https://github.com/JunkyByte/easy_ViTPose)
+- İnsan algılayıcı: [Ultralytics YOLO](https://github.com/ultralytics/ultralytics)
+- SORT takipçisi: [abewley/sort](https://github.com/abewley/sort)
+- COCO + Ayak veri seti: [CMU Perceptual Computing Lab](https://cmu-perceptual-computing-lab.github.io/foot_keypoint_dataset/)
