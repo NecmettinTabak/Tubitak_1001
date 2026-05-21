@@ -375,4 +375,4 @@ Helper scripts included in this repository:
 
 ---
 
-[README](README.md) | [README_ENGLISH](README_english.md)
+[README_TURKISH](README.md) | [README_ENGLISH](README_english.md)
