@@ -375,4 +375,4 @@ Bu repoda yer alan yardımcı betikler:
 
 ---
 
-[README](README.md) | [README_ENGLISH](README_ENGLISH.md)
+[README](README.md) | [README_ENGLISH](README_english.md)
