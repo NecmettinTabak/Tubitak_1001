@@ -26,7 +26,7 @@ Bu proje, [easy_ViTPose](https://github.com/JunkyByte/easy_ViTPose) kütüphanes
 3. Omuz, dirsek, kalça ve diz için **eklem açılarını** görüntü üzerinde göstermek.
 4. Düzenlenen sonuçları JSON dosyasına **kaydedip** aşağı akış boru hatlarına aktarmak.
 5. Batch sonuçlarında araç çubuğuna gömülü **Prev / Next** kontrolleriyle kare kare gezinmek.
-6. Mevcut bir JSON dosyasını herhangi bir görüntü üzerine yansıtarak **iskelet görselleştirmesi** yapmak (yeniden çıkarım gerekmez).
+6. Mevcut bir JSON dosyasındaki poz koordinatlarını kullanarak **iskelet görselleştirmesi** yapmak (yeniden çıkarım gerekmez).
 
 Bu araç; jimnastik, atletizm gibi alanlarda otomatik poz tahminlerinin manuel olarak düzeltilmesinin gerektiği **biyomekanik / spor bilimi araştırmaları** için tasarlanmıştır.
 
@@ -50,8 +50,8 @@ Bu araç; jimnastik, atletizm gibi alanlarda otomatik poz tahminlerinin manuel o
 │  Batch galeri (küçük resim şeridi, klasör modu)                         │
 │  Kare / Görüntü kaydırıcısı                                             │
 ├─────────────────────────────────────────────────────────────────────────┤
-│  JSON Yükleme → Çizim  (bağımsız kaplama bölümü)                        │
-│  • Kaynak görüntü + mevcut .json yükle → iskelet kaplamasını işle       │
+│  JSON Yükleme → Çizim  (JSON'dan poz görselleştirme bölümü)             │
+│  • Kaynak görüntü + mevcut .json yükle → iskeleti koordinatlardan çiz   │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -149,8 +149,8 @@ pip install -e .
 
 ```bash
 # 1. Bu repoyu klonlayın
-git clone https://github.com/<kullanici-adiniz>/easy_ViTPose.git
-cd easy_ViTPose
+git clone https://github.com/NecmettinTabak/Tubitak_1001.git
+cd Tubitak_1001/easy_ViTPose
 
 # 2. Önce PyTorch'u kurun (bkz. Ön Koşullar → adım 2)
 
@@ -194,10 +194,6 @@ checkpoints/
 **Hugging Face** üzerinden indirin:  
 👉 [https://huggingface.co/JunkyByte/easy_ViTPose](https://huggingface.co/JunkyByte/easy_ViTPose)
 
-> [!WARNING]
-> Model dosyaları (`.pth`, `.pt`, `.onnx`) git-ignored olup ayrıca indirilmelidir.  
-> Bu dosyaları repoya **commit etmeyin**.
-
 YOLO modeli için Ultralytics ilk çalıştırmada otomatik olarak indirir; ya da manuel indirebilirsiniz:
 
 ```bash
@@ -235,12 +231,16 @@ http://127.0.0.1:7860
 4. **◀ Prev / Next ▶** veya **Frame / Image** kaydırıcısıyla gezinin.
 5. Her kareyi bağımsız olarak düzenleyin ve kaydedin.
 
-### JSON Kaplama Modu (Alt Bölüm)
+### JSON Dosyasından Poz Çizimi (Alt Bölüm)
 
-1. Bir kaynak görüntü yükleyin.
-2. Mevcut bir poz `.json` dosyası yükleyin (easy_ViTPose çıktı formatında).
+Bu bölüm, görüntü üzerinde modeli tekrar çalıştırmadan daha önce üretilmiş bir poz `.json` dosyasındaki koordinatları kullanır. Yani sistem yeni bir ViTPose çıkarımı yapmaz; JSON içinde kayıtlı eklem noktalarını okur, bu noktaları kaynak görüntünün üzerine yerleştirir ve iskelet çizimini bu verilerden oluşturur.
+
+Bu kullanım özellikle daha önce çıkarımı yapılmış veya manuel olarak düzeltilip kaydedilmiş poz verilerini kontrol etmek için yararlıdır. Örneğin bir görüntüye ait JSON dosyasını yükleyerek koordinatların doğru kişiye, doğru eklemlere ve doğru görüntü boyutuna karşılık gelip gelmediğini görsel olarak inceleyebilirsiniz.
+
+1. Pozu görselleştirilecek kaynak görüntüyü yükleyin.
+2. Aynı görüntüye ait veya aynı koordinat sistemiyle hazırlanmış poz `.json` dosyasını yükleyin (easy_ViTPose çıktı formatında).
 3. **Draw From Uploaded JSON** düğmesine tıklayın.
-4. Çıkarım yeniden çalıştırılmadan iskelet görüntü üzerine çizilir.
+4. JSON dosyasındaki eklem koordinatları okunur ve iskelet görüntü üzerine çizilir.
 
 ---
 
@@ -372,3 +372,7 @@ Bu repoda yer alan yardımcı betikler:
 - İnsan algılayıcı: [Ultralytics YOLO](https://github.com/ultralytics/ultralytics)
 - SORT takipçisi: [abewley/sort](https://github.com/abewley/sort)
 - COCO + Ayak veri seti: [CMU Perceptual Computing Lab](https://cmu-perceptual-computing-lab.github.io/foot_keypoint_dataset/)
+
+---
+
+[README](README.md) | [README_ENGLISH](README_ENGLISH.md)
